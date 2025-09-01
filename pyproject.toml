@@ -1,10 +1,14 @@
 [project]
-name = "uv-devcontainer-template"
-version = "0.1.0"
-description = "Add your description here"
+name = "sitewinder"
+version = "0.0.1"
+description = "Angular-like components in pure Python with PyScript + pyhtml5."
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
-    "glom==24.*",
-    "pytest==8.*",
+    "pyhtml5"
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=8.3.5",
 ]
