@@ -5,7 +5,7 @@ Features:
 - Component base class with template(), optional styles, and lifecycle hooks.
 - Signals (reactive state), automatic change detection (per component).
 - Event binding helpers and basic two-way binding for form elements.
-- Child component mounting via portal().
+- Child component mounting via child().
 - Hash router and simple bootstrap().
 - Optional per-instance style scoping (opt-in).
 
@@ -66,7 +66,7 @@ def _is_dom_node(obj) -> bool:
 
 # --------- pyhtml5 integration ----------------------------------------------------
 
-from pyhtml5 import Division  # used for portals / host wrappers
+from pyhtml5 import Division  # used for child placeholders / host wrappers
 from pyhtml5 import Element, Fragment, Node, Stylesheet
 
 # --------- Reactive core ----------------------------------------------------------
@@ -159,7 +159,7 @@ class EventEmitter:
 
 # --------- Component base ---------------------------------------------------------
 
-_portal_id_iter = (f"swp-{i}" for i in itertools.count(1))
+_child_id_iter = (f"swc-{i}" for i in itertools.count(1))
 _event_id_iter = (f"swe-{i}" for i in itertools.count(1))
 _comp_instance_iter = (i for i in itertools.count(1))
 
@@ -201,7 +201,7 @@ class Component:
     Helpers inside template():
       - self.on(element, 'click', handler)
       - self.bind_value(input_element, signal, event='input'|'change', prop='value'|'checked', coerce=...)
-      - self.portal(ChildComponentClass, **props)
+      - self.child(ChildComponentClass, **props)
     """
 
     selector: Optional[str] = None
@@ -217,7 +217,7 @@ class Component:
 
         self._event_bindings: List[_EventBinding] = []
         self._value_bindings: List[_ValueBinding] = []
-        self._portal_children: List[Tuple[str, type, Dict[str, Any]]] = []
+        self._child_components: List[Tuple[str, type, Dict[str, Any]]] = []
 
         self._signal_unsubs: List[Callable[[], None]] = []
         self._pending_render = False
@@ -327,16 +327,13 @@ class Component:
             pass
         return element
 
-    # ----- child components (portals) --------------------------------------------
-    def portal(self, child_component_cls: type, **child_props) -> Element:
-        portal_id = next(_portal_id_iter)
+    # ----- child components -------------------------------------------------------
+    def child(self, child_component_cls: type, **child_props) -> Element:
+        child_id = next(_child_id_iter)
         placeholder = Division()
-        placeholder.set_attr(**{"data-sw-portal": portal_id})
-        self._portal_children.append((portal_id, child_component_cls, child_props))
+        placeholder.set_attr(**{"data-sw-child": child_id})
+        self._child_components.append((child_id, child_component_cls, child_props))
         return placeholder
-
-    def use(self, child_component_cls: type, **props) -> Element:
-        return self.portal(child_component_cls, **props)
 
     # ----- stable id helpers ------------------------------------------------------
     def _stable_id_for(self, obj: Any, *, prefix: str = "k") -> str:
@@ -526,7 +523,7 @@ class Component:
         self._cleanup_bindings()
         self._event_bindings.clear()
         self._value_bindings.clear()
-        self._portal_children.clear()
+        self._child_components.clear()
 
         for unsub in self._signal_unsubs:
             try:
@@ -579,7 +576,7 @@ class Component:
         # BINDINGS
         self._apply_event_bindings()
         self._apply_value_bindings()
-        self._mount_portal_children()
+        self._mount_child_components()
 
         # RESTORE FOCUS AFTER DOM & BINDINGS
         self._restore_focus_state(focus_state)
@@ -693,9 +690,9 @@ class Component:
             vb.proxy = proxy
             self._signal_unsubs.append(unsub)
 
-    def _mount_portal_children(self):
-        for portal_id, cls, props in self._portal_children:
-            slot = self._root_js.querySelector(f'[data-sw-portal="{portal_id}"]')
+    def _mount_child_components(self):
+        for child_id, cls, props in self._child_components:
+            slot = self._root_js.querySelector(f'[data-sw-child="{child_id}"]')
             if not _is_dom_node(slot):
                 continue
             try:
